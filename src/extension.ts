@@ -141,28 +141,57 @@ function getMarkerLevels(textEditor: vscode.TextEditor, maxLevel: number): strin
 
 function determineFullMarker(markerLevels: string[], level: number): string {
   if (level >= markerLevels.length || markerLevels[level] === undefined) {
-    return "-";
+    const config = vscode.workspace.getConfiguration("markdown-clever-lists");
+    const bullets = config.get("defaultBullets") as string[];
+    if (bullets.length === 0) {
+      console.log("No default bullets set");
+      return "-";
+    }
+    return bullets[level % bullets.length];
   } else {
     return markerLevels[level];
   }
 }
 
 /**
- * Increments the number in a given list item as a line. If the line is not a numbered
- * list item, it will do nothing.
+ * Sets the number in a given list item as a line based on the context. If the line is
+ * not a numbered list item, it will do nothing.
  *
+ * @param textEditor The text editor to increment the list item in
+ * @param lineNumber The line number to increment the list item on
  * @param lineText The line text to increment the marker of
  * @returns The incremented marker
  */
-function incrementMarkerNumber(lineText: string): string {
+function setMarkerNumber(
+  textEditor: vscode.TextEditor,
+  lineNumber: number,
+  lineText: string
+): string {
   const match = /^(\s*)([0-9]+)([.)])/.exec(lineText);
   if (match === null) {
     return lineText;
   }
   const indentation = match[1];
-  const number = parseInt(match[2]);
-  const nextNumber = String(number + 1);
   const delimiter = match[3];
+
+  var number = 0;
+  var currentLineNumber = lineNumber;
+  while (currentLineNumber >= 0) {
+    const currentLine = textEditor.document.lineAt(currentLineNumber);
+    try {
+      const parts = new ListItemParts(currentLine, textEditor);
+      if (/^[0-9]+[.)]/.test(parts.marker)) {
+        number = parseInt(parts.marker);
+      }
+      break;
+    } catch (e) {
+      continue;
+    }
+    currentLineNumber--;
+  }
+
+  const nextNumber = String(number + 1);
+
   return indentation + nextNumber + delimiter + lineText.substring(match[0].length);
 }
 
@@ -197,7 +226,7 @@ function outdentListItem(
       determineFullMarker(markerLevels, parts.level - 1) +
       parts.trailingSpaces;
   }
-  newHead = incrementMarkerNumber(newHead);
+  newHead = setMarkerNumber(textEditor, parts.line.lineNumber, newHead);
   edit.replace(
     parts.line.range.with(
       parts.line.range.start,
@@ -217,7 +246,7 @@ function indentListItem(
     createIndentation(textEditor, parts.level + 1) +
     determineFullMarker(markerLevels, parts.level + 1) +
     parts.trailingSpaces;
-  newHead = incrementMarkerNumber(newHead);
+  newHead = setMarkerNumber(textEditor, parts.line.lineNumber, newHead);
   edit.replace(
     parts.line.range.with(
       parts.line.range.start,
@@ -240,6 +269,7 @@ function indentListItem(
 function onEnterKey(textEditor: vscode.TextEditor, edit: vscode.TextEditorEdit): void {
   const tabSize = textEditor.options.tabSize as number;
   const tabAsSpaces = " ".repeat(tabSize);
+  const config = vscode.workspace.getConfiguration("markdown-clever-lists");
 
   // Check if every cursor is at the end of a list item line (excluding whitespace) and
   // get the maximum indentation level of the list items
@@ -289,11 +319,17 @@ function onEnterKey(textEditor: vscode.TextEditor, edit: vscode.TextEditorEdit):
     }
 
     if (parts.remainder === "") {
-      // If the line consists of just a list marker, outdent it
-      outdentListItem(textEditor, edit, markerLevels, parts);
+      // If the line consists of just a list marker, either outdent or remove it
+      if (config.get("blankListItemBehaviour") === "Remove List Item") {
+        edit.delete(line.range);
+      } else {
+        outdentListItem(textEditor, edit, markerLevels, parts);
+      }
     } else {
       // Otherwise insert a new line with the current list marker style
-      const newMarkerLevel = incrementMarkerNumber(
+      const newMarkerLevel = setMarkerNumber(
+        textEditor,
+        line.lineNumber,
         `${parts.indentation}${parts.marker}${parts.trailingSpaces}`
       );
       edit.insert(cursorPosition, `\n${newMarkerLevel}`);
@@ -313,7 +349,6 @@ function onEnterKey(textEditor: vscode.TextEditor, edit: vscode.TextEditorEdit):
  * @param edit The edit object that allows us to modify the text editor
  */
 function onOutdent(textEditor: vscode.TextEditor, edit: vscode.TextEditorEdit): void {
-
   // Compute the line parts and maximum marker indent level in the selections, and check
   // whether or not we should used the default outdent command
   var maxLevel = 0;
@@ -324,10 +359,7 @@ function onOutdent(textEditor: vscode.TextEditor, edit: vscode.TextEditorEdit): 
     for (let i = Math.max(0, selection.start.line - 1); i <= selection.end.line; i++) {
       var currentParts;
       try {
-        currentParts = new ListItemParts(
-          textEditor.document.lineAt(i),
-          textEditor
-        );
+        currentParts = new ListItemParts(textEditor.document.lineAt(i), textEditor);
       } catch (e) {
         vscode.commands.executeCommand("editor.action.outdentLines");
         return;
@@ -364,7 +396,6 @@ function onOutdent(textEditor: vscode.TextEditor, edit: vscode.TextEditorEdit): 
  * @param edit The edit object that allows us to modify the text editor
  */
 function onIndent(textEditor: vscode.TextEditor, edit: vscode.TextEditorEdit): void {
-
   // Compute the line parts and maximum marker indent level in the selections, and check
   // whether or not we should used the default outdent command
   var maxLevel = 0;
@@ -375,10 +406,7 @@ function onIndent(textEditor: vscode.TextEditor, edit: vscode.TextEditorEdit): v
     for (let i = Math.max(0, selection.start.line - 1); i <= selection.end.line; i++) {
       var currentParts;
       try {
-        currentParts = new ListItemParts(
-          textEditor.document.lineAt(i),
-          textEditor
-        );
+        currentParts = new ListItemParts(textEditor.document.lineAt(i), textEditor);
       } catch (e) {
         vscode.commands.executeCommand("editor.action.indentLines");
         return;
