@@ -105,11 +105,20 @@ class ListItemParts {
 function getMarkerLevels(textEditor: vscode.TextEditor, maxLevel: number): string[] {
   const tabSize = textEditor.options.tabSize as number;
   const tabAsSpaces = " ".repeat(tabSize);
+  const activeLineNumber = textEditor.selection.active.line;
 
   var markerLevels: string[] = [];
   var levelsRecorded = 0;
   for (var i = 0; i < textEditor.document.lineCount; i++) {
-    const line = textEditor.document.lineAt(i);
+    // Start at the active line and work up, then down
+    var lineNumber;
+    if (i <= activeLineNumber) {
+      lineNumber = activeLineNumber - i;
+    } else {
+      lineNumber = i;
+    }
+
+    const line = textEditor.document.lineAt(lineNumber);
 
     // Divide the line up into line item parts
     var parts;
