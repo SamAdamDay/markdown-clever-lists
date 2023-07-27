@@ -3,6 +3,7 @@
   "displayName": "Markdown Clever Lists",
   "description": "Context-aware list continue, indent and un-indent for markdown",
   "version": "0.0.1",
+  "repository": "https://github.com/SamAdamDay/markdown-clever-lists",
   "engines": {
     "vscode": "^1.80.0"
   },
