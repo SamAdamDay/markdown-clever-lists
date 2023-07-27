@@ -17,8 +17,20 @@
   "contributes": {
     "keybindings": [
       {
-        "command": "markdown-clever-lists.continueList",
+        "command": "markdown-clever-lists.onEnterKey",
         "key": "enter",
+        "when": "editorTextFocus && editorLangId == markdown"
+      },
+      {
+        "command": "markdown-clever-lists.onOutdent",
+        "key": "Ctrl+[",
+        "mac": "Cmd+[",
+        "when": "editorTextFocus && editorLangId == markdown"
+      },
+      {
+        "command": "markdown-clever-lists.onIndent",
+        "key": "Ctrl+]",
+        "mac": "Cmd+]",
         "when": "editorTextFocus && editorLangId == markdown"
       }
     ]
