@@ -10,13 +10,16 @@
   "categories": [
     "Other"
   ],
-  "activationEvents": [],
+  "activationEvents": [
+    "onLanguage:markdown"
+  ],
   "main": "./out/extension.js",
   "contributes": {
-    "commands": [
+    "keybindings": [
       {
-        "command": "markdown-clever-lists.helloWorld",
-        "title": "Hello World"
+        "command": "markdown-clever-lists.continueList",
+        "key": "enter",
+        "when": "editorTextFocus && editorLangId == markdown"
       }
     ]
   },
