@@ -34,6 +34,14 @@ export function activate(context: vscode.ExtensionContext) {
 // This method is called when your extension is deactivated
 export function deactivate() {}
 
+/**
+ * Creates indentation up to the given level, based on the text editor's settings.
+ * 
+ * @param textEditor The text editor
+ * @param level The level of indentation to create
+ * 
+ * @returns The indentation string
+ */
 function createIndentation(textEditor: vscode.TextEditor, level: number): string {
   if (textEditor.options.insertSpaces) {
     const tabSize = textEditor.options.tabSize as number;
@@ -102,6 +110,14 @@ class ListItemParts {
   }
 }
 
+/**
+ * Get the marker heads for all indentation levels in the document, up to the given
+ * maximum level.
+ * 
+ * @param textEditor The text editor
+ * @param maxLevel The maximum level to get marker heads for
+ * @returns An array of marker heads, indexed by indentation level
+ */
 function getMarkerLevels(textEditor: vscode.TextEditor, maxLevel: number): string[] {
   const tabSize = textEditor.options.tabSize as number;
   const tabAsSpaces = " ".repeat(tabSize);
@@ -148,6 +164,15 @@ function getMarkerLevels(textEditor: vscode.TextEditor, maxLevel: number): strin
   return markerLevels;
 }
 
+/**
+ * Determines the full marker for a given level, based on the marker levels in the
+ * document. If the level is not recorded, it will use the default bullets based on the
+ * user's settings.
+ * 
+ * @param markerLevels The marker levels in the document
+ * @param level The level to get the marker for
+ * @returns The full marker for the given level
+ */
 function determineFullMarker(markerLevels: string[], level: number): string {
   if (level >= markerLevels.length || markerLevels[level] === undefined) {
     const config = vscode.workspace.getConfiguration("markdown-clever-lists");
@@ -245,6 +270,14 @@ function outdentListItem(
   );
 }
 
+/** 
+ * Indents the list item on a given line, changing the marker as appropriate.
+ * 
+ * @param textEditor The text editor that the user is typing in
+ * @param edit The edit object that allows us to modify the text editor
+ * @param markerLevels The list of marker levels to use when indenting the list item
+ * @param parts The list item parts of the line to indent
+ */
 function indentListItem(
   textEditor: vscode.TextEditor,
   edit: vscode.TextEditorEdit,
@@ -266,10 +299,9 @@ function indentListItem(
 }
 
 /**
- * This function is called when the user presses the enter key.
- * It will continue the list item if the cursor is on a nonempty list item.
- * If the cursor is on an empty list item, it will outdent the list item.
- * Otherwise, it will insert a new line as normal.
+ * This function is called when the user presses the enter key. It will continue the
+ * list item if the cursor is on a nonempty list item. If the cursor is on an empty list
+ * item, it will outdent the list item. Otherwise, it will insert a new line as normal.
  * Works with multiple cursors.
  *
  * @param textEditor The text editor that the user is typing in
@@ -350,9 +382,7 @@ function onEnterKey(textEditor: vscode.TextEditor, edit: vscode.TextEditorEdit):
  * This function is called the selection is outdented. It changes all list item markers
  * in the selection to the previous marker level. If there is any line in the selections
  * or the previous line that is not a list item, it just executes the default outdent
- * command on everything. Similarly, if the first line in any selection is more than one
- * tab-width indented compared to the previous line, it will also execute the default
- * outdent command.
+ * command on everything.
  *
  * @param textEditor The text editor that the user is typing in
  * @param edit The edit object that allows us to modify the text editor
@@ -397,9 +427,7 @@ function onOutdent(textEditor: vscode.TextEditor, edit: vscode.TextEditorEdit): 
  * This function is called the selection is indented. It changes all list item markers
  * in the selection to the previous marker level. If there is any line in the selections
  * or the previous line that is not a list item, it just executes the default indent
- * command on everything. Similarly, if the first line in any selection is more than one
- * tab-width indented compared to the previous line, it will also execute the default
- * indent command.
+ * command on everything.
  *
  * @param textEditor The text editor that the user is typing in
  * @param edit The edit object that allows us to modify the text editor
