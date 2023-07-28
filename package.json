@@ -51,7 +51,7 @@
             ],
             "description": "What to do when the enter key is pressed on a blank list item"
           },
-          "markdown-clever-lists.defaultBullets" : {
+          "markdown-clever-lists.defaultMarkers" : {
             "type": "array",
             "default": ["-"],
             "items": {

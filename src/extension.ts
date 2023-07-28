@@ -10,8 +10,6 @@ export function activate(context: vscode.ExtensionContext) {
   // This line of code will only be executed once when your extension is activated
   console.log('The "markdown-clever-lists" is extension now active');
 
-  // vscode.window.showInformationMessage('Hello World from Markdown Clever Lists!');
-
   let enterDisposable = vscode.commands.registerTextEditorCommand(
     "markdown-clever-lists.onEnterKey",
     onEnterKey
@@ -176,7 +174,7 @@ function getMarkerLevels(textEditor: vscode.TextEditor, maxLevel: number): strin
 function determineFullMarker(markerLevels: string[], level: number): string {
   if (level >= markerLevels.length || markerLevels[level] === undefined) {
     const config = vscode.workspace.getConfiguration("markdown-clever-lists");
-    const bullets = config.get("defaultBullets") as string[];
+    const bullets = config.get("defaultMarkers") as string[];
     if (bullets.length === 0) {
       console.log("No default bullets set");
       return "-";

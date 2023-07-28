@@ -1,71 +1,51 @@
-# markdown-clever-lists README
+# Markdown Clever Lists README
 
-This is the README for your extension "markdown-clever-lists". After writing up a brief description, we recommend including the following sections.
+Continue, indent and outdent markdown lists, intelligently changing marker styles based
+on the rest of the document and user settings.
+
 
 ## Features
 
-Describe specific features of your extension including screenshots of your extension in action. Image paths are relative to this README file.
+- Continue numbered and unnumbered markdown lists by pressing `Enter` at the end.
+- Pressing `Enter` on empty list item reduces list level by one (change
+  `markdown-clever-lists.blankListItemBehaviour` to disable this behaviour).
+- `Ctrl+]` and `Ctrl+[` indents and outdents.
+- Marker styles are kept consistent across levels.
+- Marker styles are guessed from the rest of the document, with configurable defaults.
+- Supported styles: `-`, `*`, `+`, `1.`, `1)`, checkboxes (e.g. `- [ ]`)
 
-For example if there is an image subfolder under your extension project workspace:
-
-\!\[feature X\]\(images/feature-x.png\)
-
-> Tip: Many popular extensions utilize animations. This is an excellent way to show off your extension! We recommend short, focused animations that are easy to follow.
-
-## Requirements
-
-If you have any requirements or dependencies, add a section describing those and how to install and configure them.
 
 ## Extension Settings
 
-Include if your extension adds any VS Code settings through the `contributes.configuration` extension point.
-
-For example:
-
 This extension contributes the following settings:
 
-* `myExtension.enable`: Enable/disable this extension.
-* `myExtension.thing`: Set to `blah` to do something.
+* `markdown-clever-lists.blankListItemBehaviour`: Set the behaviour when pressing
+  `Enter` on blank list items.
+* `markdown-clever-lists.defaultMarkers`: Configure the default list marker structure.
 
-## Known Issues
 
-Calling out known issues can help limit users opening duplicate issues against your extension.
+## Caveats
+
+- Assumes that the list marker structure follows the tab size. Indenting and outdenting
+  shifts the indentation level by the tab size, and selects the most appropriate marker
+  for that tab size.
+- Indenting and outdenting is done with `Ctrl+]` and `Ctrl+[` (or `Cmd` on Mac). If you
+  have different keybindings for indenting and outdenting you'll need to change these
+  too. Indenting by pressing `Tab` on selected text is not supported.
+
+
+## Similar extensions
+
+- [Markdown All in One](https://marketplace.visualstudio.com/items?itemName=yzhang.markdown-all-in-one)
+  has support for continuing lists, indenting and outdenting (and much more), but 
+  without changing marker styles automatically
+- [Markdown Continue](https://marketplace.visualstudio.com/items?itemName=tejasvi.markdown-continue)
+  allows continuing lists by pressing `Enter`, but has not indent or outdent
+  functionality.
+
 
 ## Release Notes
 
-Users appreciate release notes as you update your extension.
-
 ### 1.0.0
 
-Initial release of ...
-
-### 1.0.1
-
-Fixed issue #.
-
-### 1.1.0
-
-Added features X, Y, and Z.
-
----
-
-## Following extension guidelines
-
-Ensure that you've read through the extensions guidelines and follow the best practices for creating your extension.
-
-* [Extension Guidelines](https://code.visualstudio.com/api/references/extension-guidelines)
-
-## Working with Markdown
-
-You can author your README using Visual Studio Code. Here are some useful editor keyboard shortcuts:
-
-* Split the editor (`Cmd+\` on macOS or `Ctrl+\` on Windows and Linux).
-* Toggle preview (`Shift+Cmd+V` on macOS or `Shift+Ctrl+V` on Windows and Linux).
-* Press `Ctrl+Space` (Windows, Linux, macOS) to see a list of Markdown snippets.
-
-## For more information
-
-* [Visual Studio Code's Markdown Support](http://code.visualstudio.com/docs/languages/markdown)
-* [Markdown Syntax Reference](https://help.github.com/articles/markdown-basics/)
-
-**Enjoy!**
+Initial release.
