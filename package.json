@@ -2,7 +2,7 @@
   "name": "markdown-clever-lists",
   "displayName": "Markdown Clever Lists",
   "description": "Context-aware list continue, indent and outdent markdown",
-  "version": "0.0.1",
+  "version": "1.0.0",
   "repository": {
     "type": "git",
     "url": "https://github.com/SamAdamDay/markdown-clever-lists"
