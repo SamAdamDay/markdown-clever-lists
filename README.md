@@ -44,6 +44,11 @@ This extension contributes the following settings:
   functionality.
 
 
+## LICENSE
+
+MIT License.
+
+
 ## Release Notes
 
 ### 1.0.0

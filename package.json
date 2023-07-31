@@ -1,15 +1,28 @@
 {
   "name": "markdown-clever-lists",
   "displayName": "Markdown Clever Lists",
-  "description": "Context-aware list continue, indent and un-indent for markdown",
+  "description": "Context-aware list continue, indent and outdent markdown",
   "version": "0.0.1",
-  "repository": "https://github.com/SamAdamDay/markdown-clever-lists",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/SamAdamDay/markdown-clever-lists"
+  },
   "engines": {
     "vscode": "^1.80.0"
   },
   "categories": [
-    "Other"
+    "Formatters"
   ],
+  "keywords": [
+    "markdown",
+    "list",
+    "indent",
+    "outdent",
+    "unindent",
+    "marker",
+    "continue list"
+  ],
+  "icon": "assets/icon.png",
   "activationEvents": [
     "onLanguage:markdown"
   ],
@@ -34,11 +47,11 @@
         "when": "editorTextFocus && editorLangId == markdown"
       }
     ],
-    "configuration":[
+    "configuration": [
       {
         "title": "Markdown Clever Lists",
         "properties": {
-          "markdown-clever-lists.blankListItemBehaviour" : {
+          "markdown-clever-lists.blankListItemBehaviour": {
             "type": "string",
             "default": "Outdent",
             "enum": [
@@ -51,9 +64,11 @@
             ],
             "description": "What to do when the enter key is pressed on a blank list item"
           },
-          "markdown-clever-lists.defaultMarkers" : {
+          "markdown-clever-lists.defaultMarkers": {
             "type": "array",
-            "default": ["-"],
+            "default": [
+              "-"
+            ],
             "items": {
               "type": "string"
             },
