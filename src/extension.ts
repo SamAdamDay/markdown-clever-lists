@@ -209,6 +209,7 @@ function setMarkerNumber(
   var number = 0;
   var currentLineNumber = lineNumber;
   while (currentLineNumber >= 0) {
+    currentLineNumber--;
     const currentLine = textEditor.document.lineAt(currentLineNumber);
     try {
       const parts = new ListItemParts(currentLine, textEditor);
@@ -219,7 +220,6 @@ function setMarkerNumber(
     } catch (e) {
       continue;
     }
-    currentLineNumber--;
   }
 
   const nextNumber = String(number + 1);
@@ -368,7 +368,7 @@ function onEnterKey(textEditor: vscode.TextEditor, edit: vscode.TextEditorEdit):
       // Otherwise insert a new line with the current list marker style
       const newMarkerLevel = setMarkerNumber(
         textEditor,
-        line.lineNumber,
+        line.lineNumber + 1,
         `${parts.indentation}${parts.marker}${parts.trailingSpaces}`
       );
       edit.insert(cursorPosition, `\n${newMarkerLevel}`);
