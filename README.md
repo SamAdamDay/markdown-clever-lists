@@ -4,6 +4,8 @@ Continue, indent and outdent markdown lists, intelligently changing marker style
 on the rest of the document and user settings.
 
 
+![Extension usage demo](/assets/demo.gif)
+
 ## Features
 
 - Continue numbered and unnumbered markdown lists by pressing `Enter` at the end.
