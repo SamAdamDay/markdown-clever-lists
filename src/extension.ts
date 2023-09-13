@@ -34,10 +34,10 @@ export function deactivate() {}
 
 /**
  * Creates indentation up to the given level, based on the text editor's settings.
- * 
+ *
  * @param textEditor The text editor
  * @param level The level of indentation to create
- * 
+ *
  * @returns The indentation string
  */
 function createIndentation(textEditor: vscode.TextEditor, level: number): string {
@@ -49,69 +49,235 @@ function createIndentation(textEditor: vscode.TextEditor, level: number): string
   }
 }
 
+class NotAListItemError extends Error {}
+
 /**
  * A class to hold the various parts of a list item line
+ *
+ * @property line The original text line
+ * @property initialSpacing All the space characters before the list marker
+ * @property indentationAsSpaces All the space characters before the list marker, but
+ * converted to spaces
+ * @property level The indentation level, which is the floor of the number of initial
+ * spaces divided by the tab size
+ * @property marker The list marker
+ * @property markerInitialSpaces The spaces before the marker left over after we remove
+ * the indentation level times the tab size from the initial spacing
+ * @property markerTrailingSpaces The spaces after the marker but before the remainder
+ * of the line
+ * @property remainder The remainder of the line after the list marker and trailing
+ * spaces
  */
-class ListItemParts {
+class ParsedLine {
   line: vscode.TextLine;
-  indentation: string;
-  indentationAsSpaces: string;
+  textEditor: vscode.TextEditor;
+  initialSpacing: string;
+  initialSpacingAsSpaces: string;
   level: number;
   marker: string;
-  trailingSpaces: string;
+  markerInitialSpaces: string;
+  markerIsNumber: boolean;
+  markerNumber?: number;
+  markerDelimiter?: string;
+  markerTrailingSpaces: string;
   remainder: string;
-
-  private tabSize: number;
+  protected tabSize: number;
 
   constructor(line: vscode.TextLine, textEditor: vscode.TextEditor) {
     this.line = line;
-
-    const match = /^(\s*)([-*+](?: \[[xX ]\])?|[0-9]+[.)])( +)(.*)/.exec(line.text);
-    if (match === null) {
-      throw new Error("Line is not a list item");
-    }
-
+    this.textEditor = textEditor;
     this.tabSize = textEditor.options.tabSize as number;
 
-    this.indentation = match[1];
-    this.indentationAsSpaces = this.indentation.replace(
-      /\t/g,
-      " ".repeat(this.tabSize as number)
+    // Parse the line into its parts
+    const match = /^(\s*)([-*+](?: \[[xX ]\])?|[0-9]+[.)])( +)(.*)/.exec(line.text);
+    if (match === null) {
+      throw new NotAListItemError();
+    }
+
+    this.initialSpacing = match[1];
+    this.initialSpacingAsSpaces = this.getInitialSpacingAsSpaces();
+    this.level = Math.floor(this.initialSpacing.length / this.tabSize);
+    this.markerInitialSpaces = this.initialSpacingAsSpaces.substring(
+      this.level * this.tabSize
     );
-    this.level = Math.floor(this.indentation.length / this.tabSize);
     this.marker = match[2];
-    this.trailingSpaces = match[3];
+    this.markerTrailingSpaces = match[3];
     this.remainder = match[4];
+
+    this.markerIsNumber = false;
+    this.parseMarker();
   }
 
   /**
-   * Returns the full marker, which includes the part of the indentation left over when
-   * we remove all the pieces of length `tabSize`.
+   * Parses the marker into its parts. If the marker is a number, it will set the marker
+   * number and delimiter. Otherwise, it won't set anything.
+   */
+  protected parseMarker(): void {
+    const markerMatch = /^([0-9]+)([.)])/.exec(this.marker);
+    if (markerMatch !== null) {
+      this.markerNumber = parseInt(markerMatch[1]);
+      this.markerDelimiter = markerMatch[2];
+      this.markerIsNumber = true;
+    } else {
+      this.markerIsNumber = false;
+    }
+  }
+
+  /**
+   * Returns the initial spacing with tabs converted to spaces.
+   *
+   * @returns The initial spacing as spaces
+   */
+  protected getInitialSpacingAsSpaces(): string {
+    return this.initialSpacing.replace(/\t/g, " ".repeat(this.tabSize as number));
+  }
+
+  /**
+   * Returns the full marker, which is the marker initial spaces and the marker itself.
    *
    * @returns The full marker
    */
-  getFullMarker(): string {
-    const markerInitialSpaces = this.indentationAsSpaces.substring(
-      this.level * this.tabSize
-    );
-    return markerInitialSpaces + this.marker;
+  public getFullMarker(): string {
+    return this.markerInitialSpaces + this.marker;
   }
 
   /**
-   * Returns the head of the marker, which is the indentation, the marker itself, and
-   * the trailing spaces.
+   * Returns the head of the marker, which everything but the remainder of the line,
+   * i.e. the initial spacing, the marker itself, and the trailing spaces.
    *
    * @returns The head of the marker
    */
-  getHead(): string {
-    return this.indentation + this.marker + this.trailingSpaces;
+  public getHead(): string {
+    return this.initialSpacing + this.marker + this.markerTrailingSpaces;
+  }
+}
+
+/**
+ * A class which holds a version of a parsed line which can be modified.
+ * @extends ParsedLine
+ */
+class EditedParsedLine extends ParsedLine {
+  originalParsedLine?: ParsedLine;
+
+  /*
+   * Creates an EditedParsedLine from a ParsedLine.
+   *
+   * @param parsedLine The ParsedLine to create an EditedParsedLine from
+   * @returns The EditedParsedLine
+   */
+  static fromParsedLine(parsedLine: ParsedLine): EditedParsedLine {
+    const editedParsedLine = new EditedParsedLine(
+      parsedLine.line,
+      parsedLine.textEditor
+    );
+    editedParsedLine.originalParsedLine = parsedLine;
+    return editedParsedLine;
+  }
+
+  /**
+   * Sets the marker to the given string.
+   *
+   * @param marker The marker to set
+   */
+  public setMarker(marker: string): void {
+    this.marker = marker;
+    this.parseMarker();
+  }
+
+  /**
+   * Sets the full marker to the given string, which includes the initial spacing after
+   * the indentation.
+   *
+   * @param fullMarker The full marker to set
+   */
+  public setFullMarker(fullMarker: string): void {
+    const fullMarkerMatch = /^(\s*)([-*+](?: \[[xX ]\])?|[0-9]+[.)])/.exec(fullMarker);
+    if (fullMarkerMatch === null) {
+      throw new Error("Invalid full marker");
+    }
+    this.markerInitialSpaces = fullMarkerMatch[1];
+    this.initialSpacing = createIndentation(this.textEditor, this.level);
+    this.initialSpacing = this.initialSpacing + this.markerInitialSpaces;
+    this.initialSpacingAsSpaces = this.getInitialSpacingAsSpaces();
+    this.setMarker(fullMarkerMatch[2]);
+  }
+
+  /**
+   * Sets the marker number, if the marker is a number. Otherwise, throws an error.
+   *
+   * @param number The number to set the marker to
+   */
+  public setMarkerNumber(number: number): void {
+    if (!this.markerIsNumber) {
+      throw new Error("Marker is not a number");
+    }
+    this.markerNumber = number;
+    this.marker = `${number}${this.markerDelimiter}`;
+  }
+
+  /**
+   * Sets the indentation level to the given level.
+   *
+   * @param level The level to set the indentation to
+   */
+  public setIndentationLevel(level: number): void {
+    this.level = level;
+    this.initialSpacing = createIndentation(this.textEditor, level);
+    this.initialSpacing = this.initialSpacing + this.markerInitialSpaces;
+    this.initialSpacingAsSpaces = this.getInitialSpacingAsSpaces();
+  }
+
+  /**
+   * Sets the indentation level to the given level and determines the marker based on
+   * the marker levels in the document.
+   *
+   * @param level The level to set the indentation to
+   * @param markerLevels The marker levels in the document
+   */
+  public setIndentationLevelAndDetermineMarker(
+    level: number,
+    markerLevels: string[]
+  ): void {
+    const newFullMarker = determineFullMarker(markerLevels, level);
+    this.setIndentationLevel(level);
+    this.setFullMarker(newFullMarker);
+    if (this.markerIsNumber) {
+      const newNumber = determineMarkerNumber(
+        this.textEditor,
+        this.line.lineNumber,
+        this.level
+      );
+      this.setMarkerNumber(newNumber);
+    }
+  }
+
+  /**
+   * Updates the head of the line in the text editor to match the head of the line in
+   * the EditedParsedLine.
+   *
+   * @param edit The edit object that allows us to modify the text editor
+   */
+  public updateEditorHead(edit: vscode.TextEditorEdit): void {
+    if (this.originalParsedLine === undefined) {
+      throw new Error("Original parsed line is undefined");
+    }
+    edit.replace(
+      this.originalParsedLine.line.range.with(
+        this.originalParsedLine.line.range.start,
+        new vscode.Position(
+          this.originalParsedLine.line.lineNumber,
+          this.originalParsedLine.getHead().length
+        )
+      ),
+      this.getHead()
+    );
   }
 }
 
 /**
  * Get the marker heads for all indentation levels in the document, up to the given
  * maximum level.
- * 
+ *
  * @param textEditor The text editor
  * @param maxLevel The maximum level to get marker heads for
  * @returns An array of marker heads, indexed by indentation level
@@ -135,23 +301,29 @@ function getMarkerLevels(textEditor: vscode.TextEditor, maxLevel: number): strin
     const line = textEditor.document.lineAt(lineNumber);
 
     // Divide the line up into line item parts
-    var parts;
+    var parsedLine;
     try {
-      parts = new ListItemParts(line, textEditor);
+      parsedLine = new ParsedLine(line, textEditor);
     } catch (e) {
-      continue;
+      if (e instanceof NotAListItemError) {
+        continue;
+      }
+      throw e;
     }
 
     // Get the indentation size of the line and the index of the `markerLevel` array
-    if (markerLevels.length > parts.level && markerLevels[parts.level] !== undefined) {
+    if (
+      markerLevels.length > parsedLine.level &&
+      markerLevels[parsedLine.level] !== undefined
+    ) {
       continue;
     }
-    if (parts.level > maxLevel) {
+    if (parsedLine.level > maxLevel) {
       continue;
     }
 
     // Get the full marker for the line, including initial spaces after the indentation
-    markerLevels[parts.level] = parts.getFullMarker();
+    markerLevels[parsedLine.level] = parsedLine.getFullMarker();
 
     // Once we've recorded the maximum number of levels, stop
     levelsRecorded++;
@@ -166,7 +338,7 @@ function getMarkerLevels(textEditor: vscode.TextEditor, maxLevel: number): strin
  * Determines the full marker for a given level, based on the marker levels in the
  * document. If the level is not recorded, it will use the default bullets based on the
  * user's settings.
- * 
+ *
  * @param markerLevels The marker levels in the document
  * @param level The level to get the marker for
  * @returns The full marker for the given level
@@ -186,45 +358,46 @@ function determineFullMarker(markerLevels: string[], level: number): string {
 }
 
 /**
- * Sets the number in a given list item as a line based on the context. If the line is
- * not a numbered list item, it will do nothing.
+ * Determines the marker number for a given line based on context. If the line is not a
+ * numbered list item, it will throw an error.
  *
- * @param textEditor The text editor to increment the list item in
- * @param lineNumber The line number to increment the list item on
- * @param lineText The line text to increment the marker of
- * @returns The incremented marker
+ * @param textEditor The text editor
+ * @param lineNumber The line number to get the marker number for
+ * @param indentationLevel The indentation level of the line
+ * @returns The marker number determined from context
  */
-function setMarkerNumber(
+function determineMarkerNumber(
   textEditor: vscode.TextEditor,
   lineNumber: number,
-  lineText: string
-): string {
-  const match = /^(\s*)([0-9]+)([.)])/.exec(lineText);
-  if (match === null) {
-    return lineText;
-  }
-  const indentation = match[1];
-  const delimiter = match[3];
-
+  indentationLevel: number
+): number {
+  // Get the most recent numbered list item above the current line
   var number = 0;
   var currentLineNumber = lineNumber;
   while (currentLineNumber >= 0) {
     currentLineNumber--;
     const currentLine = textEditor.document.lineAt(currentLineNumber);
     try {
-      const parts = new ListItemParts(currentLine, textEditor);
-      if (/^[0-9]+[.)]/.test(parts.marker)) {
-        number = parseInt(parts.marker);
+      const currentParsedLine = new ParsedLine(currentLine, textEditor);
+      if (
+        currentParsedLine.markerIsNumber &&
+        currentParsedLine.level === indentationLevel
+        ) {
+        number = currentParsedLine.markerNumber as number;
+        break;
       }
-      break;
+      if (currentParsedLine.level < indentationLevel) {
+        break;
+      }
     } catch (e) {
-      continue;
+      if (e instanceof NotAListItemError) {
+        continue;
+      }
+      throw e;
     }
   }
 
-  const nextNumber = String(number + 1);
-
-  return indentation + nextNumber + delimiter + lineText.substring(match[0].length);
+  return number + 1;
 }
 
 /**
@@ -236,7 +409,7 @@ function setMarkerNumber(
  * @param textEditor The text editor that the user is typing in
  * @param edit The edit object that allows us to modify the text editor
  * @param markerLevels The list of marker levels to use when outdenting the list item
- * @param parts The list item parts of the line to outdent
+ * @param parsedLine The parsed line to outdent
  * @param stopAtFirstLevel Whether to stop at the first level of indentation. If false,
  *                         will remove the last level of indentation, removing the list
  *                        item entirely if it is at the first level of indentation.
@@ -245,55 +418,39 @@ function outdentListItem(
   textEditor: vscode.TextEditor,
   edit: vscode.TextEditorEdit,
   markerLevels: string[],
-  parts: ListItemParts,
-  stopAtFirstLevel: boolean = false
+  parsedLine: ParsedLine
 ): void {
-  var newHead = "";
-  if (parts.level === 0 && stopAtFirstLevel) {
+  if (parsedLine.level === 0) {
     return;
   }
-  if (parts.level > 0) {
-    newHead =
-      createIndentation(textEditor, parts.level - 1) +
-      determineFullMarker(markerLevels, parts.level - 1) +
-      parts.trailingSpaces;
-  }
-  newHead = setMarkerNumber(textEditor, parts.line.lineNumber, newHead);
-  edit.replace(
-    parts.line.range.with(
-      parts.line.range.start,
-      new vscode.Position(parts.line.lineNumber, parts.getHead().length)
-    ),
-    newHead
+  const editedParsedLine = EditedParsedLine.fromParsedLine(parsedLine);
+  editedParsedLine.setIndentationLevelAndDetermineMarker(
+    parsedLine.level - 1,
+    markerLevels
   );
+  editedParsedLine.updateEditorHead(edit);
 }
 
-/** 
+/**
  * Indents the list item on a given line, changing the marker as appropriate.
- * 
+ *
  * @param textEditor The text editor that the user is typing in
  * @param edit The edit object that allows us to modify the text editor
  * @param markerLevels The list of marker levels to use when indenting the list item
- * @param parts The list item parts of the line to indent
+ * @param parsedLine The parsed line to indent
  */
 function indentListItem(
   textEditor: vscode.TextEditor,
   edit: vscode.TextEditorEdit,
   markerLevels: string[],
-  parts: ListItemParts
+  parsedLine: ParsedLine
 ): void {
-  let newHead =
-    createIndentation(textEditor, parts.level + 1) +
-    determineFullMarker(markerLevels, parts.level + 1) +
-    parts.trailingSpaces;
-  newHead = setMarkerNumber(textEditor, parts.line.lineNumber, newHead);
-  edit.replace(
-    parts.line.range.with(
-      parts.line.range.start,
-      new vscode.Position(parts.line.lineNumber, parts.getHead().length)
-    ),
-    newHead
+  const editedParsedLine = EditedParsedLine.fromParsedLine(parsedLine);
+  editedParsedLine.setIndentationLevelAndDetermineMarker(
+    parsedLine.level + 1,
+    markerLevels
   );
+  editedParsedLine.updateEditorHead(edit);
 }
 
 /**
@@ -316,19 +473,22 @@ function onEnterKey(textEditor: vscode.TextEditor, edit: vscode.TextEditorEdit):
   var maxLevel = 0;
   for (const selection of textEditor.selections) {
     const line = textEditor.document.lineAt(selection.active.line);
-    var parts;
+    var parsedLine;
     try {
-      parts = new ListItemParts(line, textEditor);
+      parsedLine = new ParsedLine(line, textEditor);
     } catch (e) {
-      allCursorsOnListItems = false;
-      break;
+      if (e instanceof NotAListItemError) {
+        allCursorsOnListItems = false;
+        break;
+      }
+      throw e;
     }
     if (!/^\s*$/.test(line.text.substring(selection.active.character))) {
       allCursorsOnListItems = false;
       break;
     }
-    if (parts.level > maxLevel) {
-      maxLevel = parts.level;
+    if (parsedLine.level > maxLevel) {
+      maxLevel = parsedLine.level;
     }
   }
 
@@ -348,30 +508,37 @@ function onEnterKey(textEditor: vscode.TextEditor, edit: vscode.TextEditorEdit):
     // Split the line into the indentation and the text
     const cursorPosition = selection.active;
     const line = textEditor.document.lineAt(cursorPosition.line);
-    var parts;
+    var parsedLine;
     try {
-      parts = new ListItemParts(line, textEditor);
+      parsedLine = new ParsedLine(line, textEditor);
     } catch (e) {
-      console.error(`Line '${line.text}' should be a list item but isn't`);
-      edit.insert(cursorPosition, "\n");
-      continue;
+      if (e instanceof NotAListItemError) {
+        console.error(`Line '${line.text}' should be a list item but isn't`);
+        edit.insert(cursorPosition, "\n");
+        continue;
+      }
+      throw e;
     }
 
-    if (parts.remainder === "") {
+    if (parsedLine.remainder === "") {
       // If the line consists of just a list marker, either outdent or remove it
       if (config.get("blankListItemBehaviour") === "Remove List Item") {
         edit.delete(line.range);
       } else {
-        outdentListItem(textEditor, edit, markerLevels, parts);
+        outdentListItem(textEditor, edit, markerLevels, parsedLine);
       }
     } else {
       // Otherwise insert a new line with the current list marker style
-      const newMarkerLevel = setMarkerNumber(
-        textEditor,
-        line.lineNumber + 1,
-        `${parts.indentation}${parts.marker}${parts.trailingSpaces}`
-      );
-      edit.insert(cursorPosition, `\n${newMarkerLevel}`);
+      const newParsedLine = EditedParsedLine.fromParsedLine(parsedLine);
+      if (newParsedLine.markerIsNumber) {
+        const newNumber = determineMarkerNumber(
+          textEditor,
+          line.lineNumber + 1,
+          parsedLine.level
+        );
+        newParsedLine.setMarkerNumber(newNumber);
+      }
+      edit.insert(cursorPosition, "\n" + newParsedLine.getHead());
     }
   }
 }
@@ -389,22 +556,25 @@ function onOutdent(textEditor: vscode.TextEditor, edit: vscode.TextEditorEdit): 
   // Compute the line parts and maximum marker indent level in the selections, and check
   // whether or not we should used the default outdent command
   var maxLevel = 0;
-  var parts: ListItemParts[][] = [];
+  var parsedLines: ParsedLine[][] = [];
   for (let j = 0; j < textEditor.selections.length; j++) {
     const selection = textEditor.selections[j];
-    parts[j] = [];
+    parsedLines[j] = [];
     for (let i = Math.max(0, selection.start.line - 1); i <= selection.end.line; i++) {
-      var currentParts;
+      var currentParsedLine;
       try {
-        currentParts = new ListItemParts(textEditor.document.lineAt(i), textEditor);
+        currentParsedLine = new ParsedLine(textEditor.document.lineAt(i), textEditor);
       } catch (e) {
-        vscode.commands.executeCommand("editor.action.outdentLines");
-        return;
+        if (e instanceof NotAListItemError) {
+          vscode.commands.executeCommand("editor.action.outdentLines");
+          return;
+        }
+        throw e;
       }
       if (i > selection.start.line - 1) {
-        parts[j].push(currentParts);
-        if (currentParts.level > maxLevel) {
-          maxLevel = currentParts.level;
+        parsedLines[j].push(currentParsedLine);
+        if (currentParsedLine.level > maxLevel) {
+          maxLevel = currentParsedLine.level;
         }
       }
     }
@@ -416,7 +586,7 @@ function onOutdent(textEditor: vscode.TextEditor, edit: vscode.TextEditorEdit): 
   for (let j = 0; j < textEditor.selections.length; j++) {
     const selection = textEditor.selections[j];
     for (let i = 0; i <= selection.end.line - selection.start.line; i++) {
-      outdentListItem(textEditor, edit, markerLevels, parts[j][i], true);
+      outdentListItem(textEditor, edit, markerLevels, parsedLines[j][i]);
     }
   }
 }
@@ -434,22 +604,25 @@ function onIndent(textEditor: vscode.TextEditor, edit: vscode.TextEditorEdit): v
   // Compute the line parts and maximum marker indent level in the selections, and check
   // whether or not we should used the default outdent command
   var maxLevel = 0;
-  var parts: ListItemParts[][] = [];
+  var parsedLine: ParsedLine[][] = [];
   for (let j = 0; j < textEditor.selections.length; j++) {
     const selection = textEditor.selections[j];
-    parts[j] = [];
+    parsedLine[j] = [];
     for (let i = Math.max(0, selection.start.line - 1); i <= selection.end.line; i++) {
-      var currentParts;
+      var currentParsedLine;
       try {
-        currentParts = new ListItemParts(textEditor.document.lineAt(i), textEditor);
+        currentParsedLine = new ParsedLine(textEditor.document.lineAt(i), textEditor);
       } catch (e) {
-        vscode.commands.executeCommand("editor.action.indentLines");
-        return;
+        if (e instanceof NotAListItemError) {
+          vscode.commands.executeCommand("editor.action.indentLines");
+          return;
+        }
+        throw e;
       }
       if (i > selection.start.line - 1) {
-        parts[j].push(currentParts);
-        if (currentParts.level > maxLevel) {
-          maxLevel = currentParts.level;
+        parsedLine[j].push(currentParsedLine);
+        if (currentParsedLine.level > maxLevel) {
+          maxLevel = currentParsedLine.level;
         }
       }
     }
@@ -461,7 +634,7 @@ function onIndent(textEditor: vscode.TextEditor, edit: vscode.TextEditorEdit): v
   for (let j = 0; j < textEditor.selections.length; j++) {
     const selection = textEditor.selections[j];
     for (let i = 0; i <= selection.end.line - selection.start.line; i++) {
-      indentListItem(textEditor, edit, markerLevels, parts[j][i]);
+      indentListItem(textEditor, edit, markerLevels, parsedLine[j][i]);
     }
   }
 }
