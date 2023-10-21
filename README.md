@@ -53,6 +53,10 @@ MIT License.
 
 ## Release Notes
 
+### 1.0.1
+
+- Fix numbered lists not continuing correctly when there is a sub-list
+
 ### 1.0.0
 
 Initial release.
