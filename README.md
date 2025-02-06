@@ -15,6 +15,7 @@ on the rest of the document and user settings.
 - Marker styles are kept consistent across levels.
 - Marker styles are guessed from the rest of the document, with configurable defaults.
 - Supported styles: `-`, `*`, `+`, `1.`, `1)`, checkboxes (e.g. `- [ ]`)
+- Subsequent numbered lists are updated to keep them consistent
 
 
 ## Extension Settings
@@ -24,6 +25,8 @@ This extension contributes the following settings:
 * `markdown-clever-lists.blankListItemBehaviour`: Set the behaviour when pressing
   `Enter` on blank list items.
 * `markdown-clever-lists.defaultMarkers`: Configure the default list marker structure.
+* `markdown-clever-lists.autoNumbering`: Whether to update the numbers of subsequent
+  list items when indenting, outdenting or continuing a list
 
 
 ## Caveats
@@ -53,9 +56,17 @@ MIT License.
 
 ## Release Notes
 
+### 1.1.0
+
+- Subsequent numbered list items update when indenting, de-denting or adding a new item
+- Fixed a bug where indenting or de-denting on the first line of the document caused an
+  uncaught error
+
+
 ### 1.0.1
 
 - Fix numbered lists not continuing correctly when there is a sub-list
+
 
 ### 1.0.0
 

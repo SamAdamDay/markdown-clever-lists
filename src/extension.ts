@@ -374,7 +374,7 @@ function determineMarkerNumber(
   // Get the most recent numbered list item above the current line
   var number = 0;
   var currentLineNumber = lineNumber;
-  while (currentLineNumber >= 0) {
+  while (currentLineNumber > 0) {
     currentLineNumber--;
     const currentLine = textEditor.document.lineAt(currentLineNumber);
     try {
@@ -382,7 +382,7 @@ function determineMarkerNumber(
       if (
         currentParsedLine.markerIsNumber &&
         currentParsedLine.level === indentationLevel
-        ) {
+      ) {
         number = currentParsedLine.markerNumber as number;
         break;
       }
@@ -412,14 +412,15 @@ function determineMarkerNumber(
  * @param parsedLine The parsed line to outdent
  * @param stopAtFirstLevel Whether to stop at the first level of indentation. If false,
  *                         will remove the last level of indentation, removing the list
- *                        item entirely if it is at the first level of indentation.
+ *                         item entirely if it is at the first level of indentation.
+ * @returns The edited parsed line, or undefined if the line is not a list item
  */
 function outdentListItem(
   textEditor: vscode.TextEditor,
   edit: vscode.TextEditorEdit,
   markerLevels: string[],
   parsedLine: ParsedLine
-): void {
+): void | EditedParsedLine {
   if (parsedLine.level === 0) {
     return;
   }
@@ -429,6 +430,7 @@ function outdentListItem(
     markerLevels
   );
   editedParsedLine.updateEditorHead(edit);
+  return editedParsedLine;
 }
 
 /**
@@ -438,25 +440,86 @@ function outdentListItem(
  * @param edit The edit object that allows us to modify the text editor
  * @param markerLevels The list of marker levels to use when indenting the list item
  * @param parsedLine The parsed line to indent
+ * @returns The edited parsed line
  */
 function indentListItem(
   textEditor: vscode.TextEditor,
   edit: vscode.TextEditorEdit,
   markerLevels: string[],
   parsedLine: ParsedLine
-): void {
+): EditedParsedLine {
   const editedParsedLine = EditedParsedLine.fromParsedLine(parsedLine);
   editedParsedLine.setIndentationLevelAndDetermineMarker(
     parsedLine.level + 1,
     markerLevels
   );
   editedParsedLine.updateEditorHead(edit);
+  return editedParsedLine;
+}
+
+/**
+ * Updates the numbers of the subsequent list items of the same level after a numbered
+ * list item.
+ *
+ * @param textEditor The text editor that the user is typing in
+ * @param edit The edit object that allows us to modify the text editor
+ * @param newParsedLine The parsed line of the list item that was changed
+ * @param startLineNumber The line number of the list item that was changed
+ * @param firstMarkerNumber The number of the first marker to update. If not given, this
+ *                          will be the marker number of the newParsedLine plus one.
+ */
+function updateSubsequentMarkerNumbers(
+  textEditor: vscode.TextEditor,
+  edit: vscode.TextEditorEdit,
+  newParsedLine: ParsedLine,
+  startLineNumber: number,
+  firstMarkerNumber?: number
+) {
+  var currentLineNumber = startLineNumber + 1;
+  if (firstMarkerNumber === undefined) {
+    var correctMarkerNumber = (newParsedLine.markerNumber as number) + 1;
+  } else {
+    var correctMarkerNumber = firstMarkerNumber;
+  }
+  while (currentLineNumber < textEditor.document.lineCount) {
+    const currentLine = textEditor.document.lineAt(currentLineNumber);
+
+    // Parse the line into its parts. If it's not a list item, stop updating
+    var currentParsedLine;
+    try {
+      currentParsedLine = new ParsedLine(currentLine, textEditor);
+    } catch (e) {
+      if (e instanceof NotAListItemError) {
+        break;
+      }
+      throw e;
+    }
+
+    currentParsedLine = EditedParsedLine.fromParsedLine(currentParsedLine);
+
+    // If the level of the current line less than the level of the new line, stop
+    if (currentParsedLine.level < newParsedLine.level) {
+      break;
+    }
+
+    if (
+      currentParsedLine.level === newParsedLine.level &&
+      currentParsedLine.markerIsNumber
+    ) {
+      // Update the marker number if the level and marker type are the same
+      currentParsedLine.setMarkerNumber(correctMarkerNumber);
+      currentParsedLine.updateEditorHead(edit);
+      correctMarkerNumber++;
+    }
+    currentLineNumber++;
+  }
 }
 
 /**
  * This function is called when the user presses the enter key. It will continue the
  * list item if the cursor is on a nonempty list item. If the cursor is on an empty list
  * item, it will outdent the list item. Otherwise, it will insert a new line as normal.
+ * If the new marker is a number, it will also update any subsequent number markers.
  * Works with multiple cursors.
  *
  * @param textEditor The text editor that the user is typing in
@@ -520,25 +583,32 @@ function onEnterKey(textEditor: vscode.TextEditor, edit: vscode.TextEditorEdit):
       throw e;
     }
 
+    // If the line consists of just a list marker, either outdent or remove it
     if (parsedLine.remainder === "") {
-      // If the line consists of just a list marker, either outdent or remove it
       if (config.get("blankListItemBehaviour") === "Remove List Item") {
         edit.delete(line.range);
       } else {
         outdentListItem(textEditor, edit, markerLevels, parsedLine);
       }
-    } else {
-      // Otherwise insert a new line with the current list marker style
-      const newParsedLine = EditedParsedLine.fromParsedLine(parsedLine);
-      if (newParsedLine.markerIsNumber) {
-        const newNumber = determineMarkerNumber(
-          textEditor,
-          line.lineNumber + 1,
-          parsedLine.level
-        );
-        newParsedLine.setMarkerNumber(newNumber);
-      }
-      edit.insert(cursorPosition, "\n" + newParsedLine.getHead());
+      continue;
+    }
+
+    // Insert a new line with the current list marker style
+    const newParsedLine = EditedParsedLine.fromParsedLine(parsedLine);
+    if (newParsedLine.markerIsNumber) {
+      const newNumber = determineMarkerNumber(
+        textEditor,
+        line.lineNumber + 1,
+        parsedLine.level
+      );
+      newParsedLine.setMarkerNumber(newNumber);
+    }
+    edit.insert(cursorPosition, "\n" + newParsedLine.getHead());
+
+    // If the new line is a numbered list item, update the numbers of the following
+    // list items
+    if (newParsedLine.markerIsNumber) {
+      updateSubsequentMarkerNumbers(textEditor, edit, newParsedLine, line.lineNumber);
     }
   }
 }
@@ -553,6 +623,8 @@ function onEnterKey(textEditor: vscode.TextEditor, edit: vscode.TextEditorEdit):
  * @param edit The edit object that allows us to modify the text editor
  */
 function onOutdent(textEditor: vscode.TextEditor, edit: vscode.TextEditorEdit): void {
+  const config = vscode.workspace.getConfiguration("markdown-clever-lists");
+
   // Compute the line parts and maximum marker indent level in the selections, and check
   // whether or not we should used the default outdent command
   var maxLevel = 0;
@@ -586,7 +658,37 @@ function onOutdent(textEditor: vscode.TextEditor, edit: vscode.TextEditorEdit): 
   for (let j = 0; j < textEditor.selections.length; j++) {
     const selection = textEditor.selections[j];
     for (let i = 0; i <= selection.end.line - selection.start.line; i++) {
-      outdentListItem(textEditor, edit, markerLevels, parsedLines[j][i]);
+      const parsedLine = parsedLines[j][i];
+      const wasNumbered = parsedLine.markerIsNumber;
+      // Outdent the list item
+      const editedParsedLine = outdentListItem(
+        textEditor,
+        edit,
+        markerLevels,
+        parsedLine
+      );
+
+      // Update the numbers of the subsequent list items if the list item was numbered
+      // or is now numbered
+      if (config.get("autoNumbering")) {
+        if (wasNumbered) {
+          updateSubsequentMarkerNumbers(
+            textEditor,
+            edit,
+            parsedLine,
+            parsedLine.line.lineNumber,
+            1
+          );
+        }
+        if (editedParsedLine !== undefined && editedParsedLine.markerIsNumber) {
+          updateSubsequentMarkerNumbers(
+            textEditor,
+            edit,
+            editedParsedLine,
+            editedParsedLine.line.lineNumber
+          );
+        }
+      }
     }
   }
 }
@@ -601,13 +703,15 @@ function onOutdent(textEditor: vscode.TextEditor, edit: vscode.TextEditorEdit): 
  * @param edit The edit object that allows us to modify the text editor
  */
 function onIndent(textEditor: vscode.TextEditor, edit: vscode.TextEditorEdit): void {
+  const config = vscode.workspace.getConfiguration("markdown-clever-lists");
+
   // Compute the line parts and maximum marker indent level in the selections, and check
   // whether or not we should used the default outdent command
   var maxLevel = 0;
-  var parsedLine: ParsedLine[][] = [];
+  var parsedLines: ParsedLine[][] = [];
   for (let j = 0; j < textEditor.selections.length; j++) {
     const selection = textEditor.selections[j];
-    parsedLine[j] = [];
+    parsedLines[j] = [];
     for (let i = Math.max(0, selection.start.line - 1); i <= selection.end.line; i++) {
       var currentParsedLine;
       try {
@@ -620,7 +724,7 @@ function onIndent(textEditor: vscode.TextEditor, edit: vscode.TextEditorEdit): v
         throw e;
       }
       if (i > selection.start.line - 1) {
-        parsedLine[j].push(currentParsedLine);
+        parsedLines[j].push(currentParsedLine);
         if (currentParsedLine.level > maxLevel) {
           maxLevel = currentParsedLine.level;
         }
@@ -634,7 +738,38 @@ function onIndent(textEditor: vscode.TextEditor, edit: vscode.TextEditorEdit): v
   for (let j = 0; j < textEditor.selections.length; j++) {
     const selection = textEditor.selections[j];
     for (let i = 0; i <= selection.end.line - selection.start.line; i++) {
-      indentListItem(textEditor, edit, markerLevels, parsedLine[j][i]);
+      const parsedLine = parsedLines[j][i];
+      const wasNumbered = parsedLine.markerIsNumber;
+
+      // Outdent the list item
+      const editedParsedLine = indentListItem(
+        textEditor,
+        edit,
+        markerLevels,
+        parsedLine
+      );
+
+      // Update the numbers of the subsequent list items if the list item was numbered
+      // or is now numbered
+      if (config.get("autoNumbering")) {
+        if (wasNumbered) {
+          updateSubsequentMarkerNumbers(
+            textEditor,
+            edit,
+            parsedLine,
+            parsedLine.line.lineNumber,
+            parsedLine.markerNumber
+          );
+        }
+        if (editedParsedLine.markerIsNumber) {
+          updateSubsequentMarkerNumbers(
+            textEditor,
+            edit,
+            editedParsedLine,
+            editedParsedLine.line.lineNumber
+          );
+        }
+      }
     }
   }
 }
