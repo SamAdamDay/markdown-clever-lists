@@ -608,12 +608,7 @@ function onEnterKey(textEditor: vscode.TextEditor, edit: vscode.TextEditorEdit):
     // If the new line is a numbered list item, update the numbers of the following
     // list items
     if (newParsedLine.markerIsNumber) {
-      updateSubsequentMarkerNumbers(
-        textEditor,
-        edit,
-        newParsedLine,
-        line.lineNumber + 1
-      );
+      updateSubsequentMarkerNumbers(textEditor, edit, newParsedLine, line.lineNumber);
     }
   }
 }
