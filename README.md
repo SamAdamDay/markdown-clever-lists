@@ -56,9 +56,17 @@ MIT License.
 
 ## Release Notes
 
+### 1.1.0
+
+- Subsequent numbered list items update when indenting, de-denting or adding a new item
+- Fixed a bug where indenting or de-denting on the first line of the document caused an
+  uncaught error
+
+
 ### 1.0.1
 
 - Fix numbered lists not continuing correctly when there is a sub-list
+
 
 ### 1.0.0
 
