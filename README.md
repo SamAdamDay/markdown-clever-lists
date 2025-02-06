@@ -15,6 +15,7 @@ on the rest of the document and user settings.
 - Marker styles are kept consistent across levels.
 - Marker styles are guessed from the rest of the document, with configurable defaults.
 - Supported styles: `-`, `*`, `+`, `1.`, `1)`, checkboxes (e.g. `- [ ]`)
+- Subsequent numbered lists are updated to keep them consistent
 
 
 ## Extension Settings
