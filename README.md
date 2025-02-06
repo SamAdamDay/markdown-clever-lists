@@ -25,6 +25,8 @@ This extension contributes the following settings:
 * `markdown-clever-lists.blankListItemBehaviour`: Set the behaviour when pressing
   `Enter` on blank list items.
 * `markdown-clever-lists.defaultMarkers`: Configure the default list marker structure.
+* `markdown-clever-lists.autoNumbering`: Whether to update the numbers of subsequent
+  list items when indenting, outdenting or continuing a list
 
 
 ## Caveats

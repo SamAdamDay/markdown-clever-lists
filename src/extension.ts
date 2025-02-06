@@ -623,6 +623,8 @@ function onEnterKey(textEditor: vscode.TextEditor, edit: vscode.TextEditorEdit):
  * @param edit The edit object that allows us to modify the text editor
  */
 function onOutdent(textEditor: vscode.TextEditor, edit: vscode.TextEditorEdit): void {
+  const config = vscode.workspace.getConfiguration("markdown-clever-lists");
+
   // Compute the line parts and maximum marker indent level in the selections, and check
   // whether or not we should used the default outdent command
   var maxLevel = 0;
@@ -668,22 +670,24 @@ function onOutdent(textEditor: vscode.TextEditor, edit: vscode.TextEditorEdit): 
 
       // Update the numbers of the subsequent list items if the list item was numbered
       // or is now numbered
-      if (wasNumbered) {
-        updateSubsequentMarkerNumbers(
-          textEditor,
-          edit,
-          parsedLine,
-          parsedLine.line.lineNumber,
-          1
-        );
-      }
-      if (editedParsedLine !== undefined && editedParsedLine.markerIsNumber) {
-        updateSubsequentMarkerNumbers(
-          textEditor,
-          edit,
-          editedParsedLine,
-          editedParsedLine.line.lineNumber
-        );
+      if (config.get("autoNumbering")) {
+        if (wasNumbered) {
+          updateSubsequentMarkerNumbers(
+            textEditor,
+            edit,
+            parsedLine,
+            parsedLine.line.lineNumber,
+            1
+          );
+        }
+        if (editedParsedLine !== undefined && editedParsedLine.markerIsNumber) {
+          updateSubsequentMarkerNumbers(
+            textEditor,
+            edit,
+            editedParsedLine,
+            editedParsedLine.line.lineNumber
+          );
+        }
       }
     }
   }
@@ -699,6 +703,8 @@ function onOutdent(textEditor: vscode.TextEditor, edit: vscode.TextEditorEdit): 
  * @param edit The edit object that allows us to modify the text editor
  */
 function onIndent(textEditor: vscode.TextEditor, edit: vscode.TextEditorEdit): void {
+  const config = vscode.workspace.getConfiguration("markdown-clever-lists");
+
   // Compute the line parts and maximum marker indent level in the selections, and check
   // whether or not we should used the default outdent command
   var maxLevel = 0;
@@ -745,22 +751,24 @@ function onIndent(textEditor: vscode.TextEditor, edit: vscode.TextEditorEdit): v
 
       // Update the numbers of the subsequent list items if the list item was numbered
       // or is now numbered
-      if (wasNumbered) {
-        updateSubsequentMarkerNumbers(
-          textEditor,
-          edit,
-          parsedLine,
-          parsedLine.line.lineNumber,
-          parsedLine.markerNumber
-        );
-      }
-      if (editedParsedLine.markerIsNumber) {
-        updateSubsequentMarkerNumbers(
-          textEditor,
-          edit,
-          editedParsedLine,
-          editedParsedLine.line.lineNumber
-        );
+      if (config.get("autoNumbering")) {
+        if (wasNumbered) {
+          updateSubsequentMarkerNumbers(
+            textEditor,
+            edit,
+            parsedLine,
+            parsedLine.line.lineNumber,
+            parsedLine.markerNumber
+          );
+        }
+        if (editedParsedLine.markerIsNumber) {
+          updateSubsequentMarkerNumbers(
+            textEditor,
+            edit,
+            editedParsedLine,
+            editedParsedLine.line.lineNumber
+          );
+        }
       }
     }
   }

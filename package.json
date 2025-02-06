@@ -74,6 +74,11 @@
               "type": "string"
             },
             "description": "The default bullet characters to use when creating a new list item. Will cycle through these per indentation level. Use '1.' or '1)' for numbered lists"
+          },
+          "markdown-clever-lists.autoNumbering": {
+            "type": "boolean",
+            "default": true,
+            "description": "Update the numbers of subsequent list items when indenting, outdenting or continuing a list"
           }
         }
       }
